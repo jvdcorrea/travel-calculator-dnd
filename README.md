@@ -1,3 +1,5 @@
+Para usar [clique aqui](https://jvdcorrea.github.io/travel-calculator-dnd/)
+
 # ⚔ D&D 5e: Planejador de Viagens
 
 Calculadora de viagem para D&D 5e (regras de 2014) que roda direto no navegador. Carregue o mapa da sua campanha, defina a escala, trace a rota e veja quanto tempo o grupo leva para chegar, de acordo com o ritmo, o meio de transporte e as horas de viagem por dia.
