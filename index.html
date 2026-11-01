@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D&D 5e: Planejador de Viagens</title>
+<style>
+:root {
+  --bg:#171717; --panel:#242424; --panel2:#303030; --panel3:#2a2824;
+  --gold:#d5ad68; --text:#eee8dc; --muted:#aaa;
+  --border:#494139; --green:#a5c98c; --warn:#e5a35a; --blue:#70c8ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Georgia,serif;padding:20px}
+main{max-width:1050px;margin:auto}
+h1,h2,h3{color:var(--gold)}
+h1{text-align:center;font-size:30px}
+h2{font-size:20px;margin-top:0}
+h3{font-size:16px;margin:0 0 12px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin:16px 0}
+.subpanel{background:var(--panel3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:7px}
+.hidden{display:none !important}
+label{color:var(--gold);font-size:14px}
+input,select,button{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:10px;font:inherit;min-width:0}
+select:disabled,input:disabled{opacity:.5}
+button{cursor:pointer}
+button:hover{border-color:var(--gold)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.primary{background:#75562d;color:white}
+.active-mode{box-shadow:0 0 0 2px var(--gold) inset}
+.danger:hover{border-color:#c46a5a;color:#e8a294}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.unit{display:flex;gap:8px;align-items:center}
+.unit button{flex:1}
+.unit input{flex:1}
+.unit .nowrap{flex:0 0 auto;white-space:nowrap}
+.selected{border-color:var(--gold);color:var(--gold)}
+input[type=range]{padding:0;width:100%;accent-color:var(--gold)}
+input[type=number]{width:100%}
+.counter{display:flex;gap:8px}
+.counter button{width:48px;font-size:20px}
+.counter input{text-align:center;flex:1}
+.check{display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:15px;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--gold)}
+.result{background:#302d25;border:1px solid #77613d;padding:16px;border-radius:10px;margin-top:12px}
+.big{font-size:30px;color:var(--green);font-weight:bold}
+.muted{color:var(--muted);font-size:13px}
+.paces{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.pacecard{border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:14px;line-height:1.45;opacity:.6}
+.pacecard.on{opacity:1;border-color:var(--gold);background:#2e2a22}
+.pacecard b{color:var(--gold);display:block;margin-bottom:4px}
+.mapwrap{position:relative}
+#mapCanvas{width:100%;height:260px;background:#38352e;border:1px solid var(--border);border-radius:8px;display:block;cursor:grab;touch-action:none}
+#mapCanvas.picking{cursor:crosshair}
+.zoombar{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.zoombar button{width:38px;height:38px;padding:0;font-size:18px;background:rgba(36,36,36,.85)}
+.mapinfo{margin-top:10px;color:var(--muted);font-size:13px}
+.notes{margin:12px 0 0;padding-left:20px;color:var(--text);font-size:14px;line-height:1.5}
+.notes li{margin-bottom:6px}
+.notes .warn{color:var(--warn)}
+hr{border:0;border-top:1px solid var(--border);margin:16px 0}
+@media(max-width:700px){
+  body{padding:10px}
+  .grid,.grid3,.paces{grid-template-columns:1fr}
+  .panel{padding:13px}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>⚔ D&D: Planejador de Viagens</h1>
+<p class="muted" style="text-align:center">Regras de viagem do Livro do Jogador e do Guia do Mestre, D&D 5e (2014)</p>
+
+<section class="panel">
+<h2>1. Unidades</h2>
+<div class="grid">
+  <div class="field">
+    <label>Unidade de distância</label>
+    <div class="unit">
+      <button id="miBtn" class="selected" onclick="setDistUnit('mi')">Milhas</button>
+      <button id="kmBtn" onclick="setDistUnit('km')">Quilômetros</button>
+    </div>
+    <div class="muted">Km usa a convenção do livro em português: 1 milha = 1,5 km (ritmo normal = 4,5 km/h).</div>
+  </div>
+  <div class="field">
+    <label>Unidade de deslocamento</label>
+    <div class="unit">
+      <button id="ftBtn" class="selected" onclick="setSpeedUnit('ft')">Pés (ft)</button>
+      <button id="mBtn" onclick="setSpeedUnit('m')">Metros (m)</button>
+    </div>
+    <div class="muted">Usado nos transportes do Guia do Mestre. Convenção do livro: 5 ft = 1,5 m.</div>
+  </div>
+</div>
+</section>
+
+<section class="panel">
+<h2>2. Ritmo de viagem</h2>
+<div class="grid">
+  <div class="field">
+    <label>Ritmo</label>
+    <select id="pace" onchange="calculate()"></select>
+  </div>
+  <div class="field">
+    <label>Horas de viagem por dia</label>
+    <input type="range" id="hours" min="1" max="24" value="8" oninput="hoursDisplay();calculate()">
+    <div id="hoursLabel">8 horas</div>
+  </div>
+  <div class="field">
+    <label>Quantidade de dias</label>
+    <div class="counter">
+      <button onclick="changeDays(-1)" aria-label="Menos um dia">−</button>
+      <input type="number" id="days" value="1" min="1" max="999" onchange="validateDays();calculate()">
+      <button onclick="changeDays(1)" aria-label="Mais um dia">+</button>
+    </div>
+  </div>
+  <div class="field" style="justify-content:flex-end">
+    <label class="check">
+      <input type="checkbox" id="difficult" onchange="calculate()">
+      <span>Terreno difícil (metade da distância; voo ignora)</span>
+    </label>
+  </div>
+</div>
+
+<div class="paces" id="paceCards">
+  <div class="pacecard" data-pace="fast">
+    <b>Rápido</b>
+    −5 na Sabedoria (Percepção) passiva para notar ameaças.<br>
+    −5 no teste de Sabedoria (Sobrevivência) do navegador para não se perder.<br>
+    Não dá para forragear durante a viagem.
+  </div>
+  <div class="pacecard" data-pace="normal">
+    <b>Normal</b>
+    Sem modificadores.<br>
+    Dá para forragear durante a viagem.
+  </div>
+  <div class="pacecard" data-pace="slow">
+    <b>Lento</b>
+    O grupo pode se mover furtivamente.<br>
+    +5 no teste de Sabedoria (Sobrevivência) do navegador para não se perder.<br>
+    Dá para forragear durante a viagem.
+  </div>
+</div>
+<p class="muted">
+Percepção e furtividade: Livro do Jogador, cap. 8. Navegação e forrageio: Guia do Mestre, cap. 5.
+Personagens ocupados com outra tarefa (navegar, mapear, rastrear, forragear) não contribuem com a Percepção passiva do grupo.
+Veículos de velocidade fixa ignoram o ritmo.
+</p>
+<p class="muted">
+Marcha forçada: o padrão é 8 horas por dia. Ao fim de cada hora extra, cada personagem faz uma
+salvaguarda de Constituição com CD 10 + 1 por hora além de 8. Falha: um nível de exaustão.
+</p>
+</section>
+
+<section class="panel">
+<h2>3. Meio de transporte</h2>
+<div class="grid3">
+  <div class="field">
+    <label>Tipo</label>
+    <select id="ttype" onchange="typeChanged()"></select>
+  </div>
+  <div class="field" id="refField">
+    <label>Referência</label>
+    <select id="tref" onchange="refChanged()"></select>
+  </div>
+  <div class="field">
+    <label id="fieldLabel">Multiplicador (regra da casa)</label>
+    <input type="number" id="tvalue" min="0.1" max="1000" step="0.1" value="1" oninput="valueEdited()">
+  </div>
+</div>
+<p class="muted" id="transportHint"></p>
+</section>
+
+<section class="panel">
+<h2>4. Mapa e rota</h2>
+
+<div class="grid">
+  <div class="field">
+    <label>Mapas salvos</label>
+    <div class="unit">
+      <select id="savedMaps" style="flex:1"></select>
+      <button class="nowrap" onclick="loadSelected()">Abrir</button>
+      <button class="nowrap danger" onclick="deleteSelected()">Excluir</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>Nome do mapa atual</label>
+    <div class="unit">
+      <input type="text" id="mapName" placeholder="Ex.: Costa da Espada">
+      <button class="nowrap primary" onclick="saveMap()">Salvar</button>
+    </div>
+  </div>
+</div>
+<div class="controls">
+  <label class="muted" style="display:flex;align-items:center;gap:6px">
+    Carregar imagem nova:
+    <input type="file" id="mapFile" accept="image/png,image/jpeg,image/webp">
+  </label>
+</div>
+<div class="controls">
+  <button onclick="exportMap()">Exportar mapa (.json)</button>
+  <label class="muted" style="display:flex;align-items:center;gap:6px">
+    Importar mapa:
+    <input type="file" id="importFile" accept=".json,application/json">
+  </label>
+</div>
+
+<div class="subpanel">
+  <h3>Escala</h3>
+  <div class="grid">
+    <div class="field">
+      <label id="scaleLabel">Calibrar no mapa: distância real entre 2 pontos (milhas)</label>
+      <div class="unit">
+        <input type="number" id="scaleDistance" value="10" min="0.001" step="0.1" oninput="computeScale()">
+        <button class="nowrap primary" id="scaleBtn" onclick="setMode('scale')">Marcar 2 pontos</button>
+      </div>
+    </div>
+    <div class="field">
+      <label id="manualLabel">Ou digite a escala: pixels da imagem por milha</label>
+      <input type="number" id="manualScale" min="0" step="any" placeholder="Ex.: 25.4" oninput="manualScaleInput()">
+    </div>
+  </div>
+  <p class="muted" id="scaleDetail" style="margin-bottom:0">Sem escala definida.</p>
+</div>
+
+<div class="mapwrap" style="margin-top:14px">
+  <canvas id="mapCanvas"></canvas>
+  <div class="zoombar">
+    <button onclick="zoomCenter(1.25)" aria-label="Aproximar">+</button>
+    <button onclick="zoomCenter(0.8)" aria-label="Afastar">−</button>
+    <button onclick="fitView();draw()" aria-label="Ajustar à tela">⤢</button>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="primary" id="routeBtn" onclick="setMode('route')">Desenhar rota</button>
+  <button onclick="undoPoint()">Desfazer ponto</button>
+  <button onclick="clearRoute()">Limpar rota</button>
+</div>
+<div class="field" style="margin-top:14px">
+  <label>Distância da rota</label>
+  <div class="big" id="routeDistance">0 milhas</div>
+</div>
+<p class="mapinfo" id="mapStatus">Carregue um mapa para começar.</p>
+<p class="muted">
+Roda do mouse ou pinça para zoom, arrastar para mover. A barra no canto do mapa acompanha o zoom.
+Mapas salvos guardam imagem, escala e rota; depois de salvo, mudanças na escala e na rota são salvas sozinhas.
+</p>
+</section>
+
+<section class="panel">
+<h2>5. Resultado da viagem</h2>
+<div class="result">
+  <div class="muted">Velocidade</div>
+  <div class="big" id="hourly"></div>
+  <hr>
+  <div class="muted">Distância percorrida por dia</div>
+  <div class="big" id="daily"></div>
+  <hr>
+  <div class="muted">Distância total em <span id="daysTxt">1 dia</span></div>
+  <div class="big" id="total"></div>
+  <hr>
+  <div class="muted">Tempo estimado para completar a rota</div>
+  <div class="big" id="travelTime">sem rota</div>
+  <hr>
+  <div class="muted">Dias de viagem necessários</div>
+  <div class="big" id="neededDays">sem rota</div>
+  <ul class="notes" id="notes"></ul>
+</div>
+</section>
+
+</main>
+<script>
+// ---------- Regras ----------
+// LdJ 2014 cap. 8: o ritmo do grupo não depende do deslocamento individual.
+const PACES = {
+  fast:   {name:'Rápido', mph:4, mul:4/3},
+  normal: {name:'Normal', mph:3, mul:1},
+  slow:   {name:'Lento',  mph:2, mul:2/3}
+};
+// field: mult = ritmo do LdJ × multiplicador | speed = deslocamento ÷ 10 mi/h (GdM) | vehicle = mi/h fixo
+const TYPES = {
+  phb:{name:'Terrestre (PHB)', field:'mult',
+    hint:'Ritmo do Livro do Jogador. A pé, a cavalo, de carroça ou carruagem, o grupo anda no mesmo ritmo; o deslocamento individual não muda nada. O multiplicador é regra da casa (1 = regra oficial). Galope: uma montaria pode cobrir o dobro do ritmo rápido por cerca de 1 hora; com montarias descansadas a cada 8 a 10 milhas, dá para manter por mais tempo.'},
+  dmgLand:{name:'Terrestre (DMG)', field:'speed', fly:false,
+    hint:'Ritmo especial do Guia do Mestre: deslocamento em pés ÷ 10 = milhas por hora; rápido soma 1/3, lento multiplica por 2/3. Pela letra da regra, vale para deslocamento concedido por magia, motor ou força natural (ex.: corcel fantasma). Para montarias comuns, é uma extensão que muitas mesas usam.',
+    refs:[
+      {name:'Cavalo de montaria', ft:60},
+      {name:'Cavalo de guerra', ft:60},
+      {name:'Camelo', ft:50},
+      {name:'Cavalo de tração', ft:40},
+      {name:'Pônei', ft:40},
+      {name:'Mula ou burro', ft:40},
+      {name:'Mastim', ft:40},
+      {name:'Elefante', ft:40},
+      {name:'Corcel fantasma (magia)', ft:100, note:'Corcel fantasma dura 1 hora; para viajar mais, é preciso conjurar de novo.'}
+    ]},
+  fly:{name:'Voo (DMG)', field:'speed', fly:true,
+    hint:'Ritmo especial do Guia do Mestre para voo: deslocamento em pés ÷ 10 = milhas por hora; rápido soma 1/3, lento multiplica por 2/3. Voando, o terreno não atrasa o grupo e a rota pode ser em linha reta.',
+    refs:[
+      {name:'Pégaso', ft:90},
+      {name:'Grifo', ft:80},
+      {name:'Águia gigante', ft:80},
+      {name:'Hipogrifo', ft:60},
+      {name:'Coruja gigante', ft:60},
+      {name:'Vassoura voadora', ft:50},
+      {name:'Tapete voador', ft:80, note:'Tapete voador: 80 ft (0,9 × 1,5 m), 60 ft (1,2 × 1,8 m), 40 ft (1,5 × 2,1 m) ou 30 ft (1,8 × 2,7 m), conforme o tamanho.'},
+      {name:'Caminhar no vento (magia)', ft:300, note:'Caminhar no vento dura 8 horas.'}
+    ]},
+  water:{name:'Embarcação', field:'vehicle',
+    hint:'Embarcações andam na velocidade do navio: não sofrem a penalidade do ritmo rápido nem ganham o benefício do lento. Com tripulação suficiente, podem navegar até 24 horas por dia.',
+    refs:[
+      {name:'Barco a remo', mph:1.5},
+      {name:'Barco de quilha', mph:1},
+      {name:'Navio à vela', mph:2},
+      {name:'Navio de guerra', mph:2.5},
+      {name:'Drakkar', mph:3},
+      {name:'Galé', mph:4}
+    ]},
+  air:{name:'Aeronave', field:'vehicle',
+    hint:'Aeronave do Guia do Mestre: tripulação de 10, até 20 passageiros. Velocidade fixa, sem escolha de ritmo.',
+    refs:[{name:'Aeronave (GdM)', mph:8}]}
+};
+const KM_PER_MILE = 1.5; // convenção do livro em português
+const M_PER_FT = 0.3;    // 5 ft = 1,5 m
+
+const $ = id => document.getElementById(id);
+const state = {
+  distUnit:'mi', speedUnit:'ft',
+  image:null, imageBlob:null, mapId:null,
+  scalePts:[], scaleMiles:null, milesPerPx:null, showScale:false,
+  route:[], mode:'none',
+  view:{s:1, ox:0, oy:0, min:0.05}
+};
+
+const f = () => state.distUnit==='km' ? KM_PER_MILE : 1;
+const nf = (n, d=1) => n.toLocaleString('pt-BR',{maximumFractionDigits:d});
+const dUnit = () => state.distUnit==='km' ? 'km' : 'milhas';
+const dUnit1 = () => state.distUnit==='km' ? 'km' : 'milha';
+const sUnit = () => state.distUnit==='km' ? 'km/h' : 'mi/h';
+const fmtDist = mi => nf(mi*f(), 2)+' '+dUnit();
+const ftToDisplay = ft => state.speedUnit==='ft' ? ft : +(ft*M_PER_FT).toFixed(2);
+const curType = () => TYPES[$('ttype').value] || TYPES.phb;
+const curRef = () => { const t=curType(), i=$('tref').value; return t.refs && i!=='' ? t.refs[Number(i)] : null; };
+
+// ---------- Unidades ----------
+function setDistUnit(u){
+  if(u===state.distUnit) return;
+  const old = f();
+  state.distUnit = u;
+  $('miBtn').classList.toggle('selected', u==='mi');
+  $('kmBtn').classList.toggle('selected', u==='km');
+  const sd = $('scaleDistance');
+  sd.value = +(Number(sd.value)*f()/old).toFixed(3);
+  if(curType().field==='vehicle')
+    $('tvalue').value = +(Number($('tvalue').value)*f()/old).toFixed(2);
+  $('scaleLabel').textContent = 'Calibrar no mapa: distância real entre 2 pontos ('+dUnit()+')';
+  $('manualLabel').textContent = 'Ou digite a escala: pixels da imagem por '+dUnit1();
+  fillRefs(true); updateTransportUI();
+  updateScaleInfo(); updateRoute(); draw();
+}
+function setSpeedUnit(u){
+  if(u===state.speedUnit) return;
+  if(curType().field==='speed'){
+    const v=Number($('tvalue').value);
+    const ft = state.speedUnit==='ft' ? v : v/M_PER_FT;
+    state.speedUnit = u;
+    $('tvalue').value = ftToDisplay(ft);
+  }else state.speedUnit = u;
+  $('ftBtn').classList.toggle('selected', u==='ft');
+  $('mBtn').classList.toggle('selected', u==='m');
+  fillRefs(true); updateTransportUI(); calculate();
+}
+function hoursDisplay(){ $('hoursLabel').textContent = $('hours').value+' horas'; }
+function changeDays(n){
+  const d=$('days');
+  d.value=Math.max(1,Math.min(999,(Number(d.value)||1)+n));
+  calculate();
+}
+function validateDays(){
+  const d=$('days');
+  d.value=Math.max(1,Math.min(999,Math.round(Number(d.value))||1));
+}
+
+// ---------- Transporte ----------
+function buildTypes(){
+  const sel=$('ttype');
+  for(const [k,t] of Object.entries(TYPES)){
+    const o=document.createElement('option'); o.value=k; o.textContent=t.name; sel.appendChild(o);
+  }
+}
+function fillRefs(keep){
+  const t=curType(), sel=$('tref'), cur=sel.value;
+  sel.innerHTML='';
+  if(!t.refs) return;
+  t.refs.forEach((r,i)=>{
+    const o=document.createElement('option'); o.value=String(i);
+    o.textContent = r.ft!==undefined
+      ? `${r.name} (${ftToDisplay(r.ft)} ${state.speedUnit})`
+      : `${r.name} (${nf(r.mph*f())} ${sUnit()})`;
+    sel.appendChild(o);
+  });
+  const c=document.createElement('option'); c.value=''; c.textContent='Personalizado'; sel.appendChild(c);
+  sel.value = keep ? cur : '0';
+}
+function applyRef(){
+  const r=curRef(); if(!r) return;
+  $('tvalue').value = r.ft!==undefined ? ftToDisplay(r.ft) : +(r.mph*f()).toFixed(2);
+}
+function typeChanged(){
+  fillRefs(false);
+  if(curType().field==='mult') $('tvalue').value=1; else applyRef();
+  updateTransportUI(); calculate();
+}
+function refChanged(){ applyRef(); calculate(); }
+function valueEdited(){
+  const r=curRef(), v=Number($('tvalue').value);
+  if(r){
+    const refVal = r.ft!==undefined ? ftToDisplay(r.ft) : +(r.mph*f()).toFixed(2);
+    if(Math.abs(v-refVal)>1e-9) $('tref').value='';
+  }
+  calculate();
+}
+function updateTransportUI(){
+  const t=curType();
+  $('refField').classList.toggle('hidden', !t.refs);
+  $('fieldLabel').textContent =
+    t.field==='mult' ? 'Multiplicador (regra da casa)' :
+    t.field==='speed' ? 'Deslocamento ('+state.speedUnit+')' :
+    'Velocidade ('+sUnit()+')';
+  $('transportHint').textContent=t.hint;
+  buildPace();
+}
+function buildPace(){
+  const pace=$('pace'), cur=pace.value||'normal', t=curType();
+  pace.innerHTML='';
+  for(const [k,p] of Object.entries(PACES)){
+    const o=document.createElement('option'); o.value=k;
+    o.textContent = t.field==='speed'
+      ? p.name + (k==='fast'?' (+1/3)':k==='slow'?' (×2/3)':'')
+      : `${p.name} (${nf(p.mph*f())} ${sUnit()}, ${nf(p.mph*8*f())} ${dUnit()}/dia)`;
+    pace.appendChild(o);
+  }
+  pace.value=cur;
+  pace.disabled = t.field==='vehicle';
+}
+
+// ---------- Cálculo ----------
+function calculate(){
+  const t=curType(), ref=curRef();
+  const paceKey=$('pace').value||'normal';
+  const hours=Number($('hours').value);
+  const days=Number($('days').value)||1;
+  const value=Math.max(0, Number($('tvalue').value)||0);
+  const difficult=$('difficult').checked;
+  const vehicle = t.field==='vehicle';
+
+  document.querySelectorAll('.pacecard').forEach(c=>
+    c.classList.toggle('on', !vehicle && c.dataset.pace===paceKey));
+
+  let hourly; // milhas por hora
+  if(vehicle) hourly = value/f();
+  else if(t.field==='speed'){
+    const ft = state.speedUnit==='ft' ? value : value/M_PER_FT;
+    hourly = ft/10 * PACES[paceKey].mul;
+  }else hourly = PACES[paceKey].mph * value;
+
+  const halved = difficult && !vehicle && !t.fly;
+  if(halved) hourly/=2;
+
+  const daily=hourly*hours, total=daily*days;
+  $('hourly').textContent = nf(hourly*f(),2)+' '+sUnit();
+  $('daily').textContent = fmtDist(daily);
+  $('total').textContent = fmtDist(total);
+  $('daysTxt').textContent = days===1 ? '1 dia' : days+' dias';
+
+  const routeMi=getRouteMiles();
+  if(routeMi>0 && hourly>0){
+    const totalH=routeMi/hourly;
+    const full=Math.floor(totalH/hours+1e-9);
+    let rem=totalH-full*hours; if(rem<1e-6) rem=0;
+    const parts=[];
+    if(full>0) parts.push(full+(full===1?' dia':' dias'));
+    if(rem>0) parts.push(nf(rem)+' h');
+    $('travelTime').textContent=parts.join(' e ');
+    $('neededDays').textContent=Math.ceil(totalH/hours-1e-9);
+  }else{
+    $('travelTime').textContent='sem rota';
+    $('neededDays').textContent='sem rota';
+  }
+
+  const notes=[];
+  if(ref && ref.note) notes.push(ref.note);
+  if(halved) notes.push('Terreno difícil: distância pela metade.');
+  if(difficult && t.fly) notes.push('Voo ignora o terreno difícil.');
+  if(!vehicle && hours>8){
+    const extra=hours-8, dcs=[];
+    for(let i=1;i<=extra;i++) dcs.push(`${8+i}ª h: CD ${10+i}`);
+    notes.push('<span class="warn">Marcha forçada: '+extra+(extra===1?' salvaguarda':' salvaguardas')+
+      ' de Constituição por personagem.</span> '+dcs.join(', ')+'. Cada falha: 1 nível de exaustão.');
+    if(t.field==='speed') notes.push('As regras não dizem se a montaria também faz a salvaguarda; fica a critério do mestre.');
+  }
+  if(vehicle && hours>8) notes.push('Viajar mais de 8 h por dia num veículo não é marcha forçada, mas exige tripulação para revezar.');
+  $('notes').innerHTML=notes.map(n=>'<li>'+n+'</li>').join('');
+}
+
+// ---------- Mapa: canvas em alta resolução, zoom e pan ----------
+const canvas=$('mapCanvas'), ctx=canvas.getContext('2d');
+let dpr=1, cssW=0, cssH=260;
+
+function resizeCanvas(refit){
+  cssW=canvas.parentElement.clientWidth;
+  cssH=260;
+  if(state.image){
+    const ar=state.image.naturalHeight/state.image.naturalWidth;
+    cssH=Math.max(260, Math.min(window.innerHeight*0.75, cssW*ar));
+  }
+  dpr=window.devicePixelRatio||1;
+  canvas.style.height=cssH+'px';
+  canvas.width=Math.round(cssW*dpr);
+  canvas.height=Math.round(cssH*dpr);
+  if(refit) fitView();
+  draw();
+}
+function fitView(){
+  const img=state.image; if(!img) return;
+  const s=Math.min(cssW/img.naturalWidth, cssH/img.naturalHeight);
+  state.view={s, ox:(cssW-img.naturalWidth*s)/2, oy:(cssH-img.naturalHeight*s)/2, min:s*0.5};
+}
+function zoomAt(cx,cy,factor){
+  const v=state.view;
+  const ns=Math.min(30, Math.max(v.min, v.s*factor));
+  v.ox=cx-(cx-v.ox)*(ns/v.s);
+  v.oy=cy-(cy-v.oy)*(ns/v.s);
+  v.s=ns; draw();
+}
+function zoomCenter(fct){ if(state.image) zoomAt(cssW/2,cssH/2,fct); }
+const toScreen=p=>({x:p.x*state.view.s+state.view.ox, y:p.y*state.view.s+state.view.oy});
+const toImage=(x,y)=>({x:(x-state.view.ox)/state.view.s, y:(y-state.view.oy)/state.view.s});
+
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#38352e'; ctx.fillRect(0,0,cssW,cssH);
+  const img=state.image;
+  if(!img){
+    ctx.fillStyle='#aaa'; ctx.font='15px Georgia, serif'; ctx.textAlign='center';
+    ctx.fillText('Carregue ou abra um mapa', cssW/2, cssH/2); ctx.textAlign='left';
+    return;
+  }
+  const v=state.view;
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  ctx.drawImage(img, v.ox, v.oy, img.naturalWidth*v.s, img.naturalHeight*v.s);
+
+  // Linha de calibração: só durante a calibração ou logo depois dela
+  const showScale = state.mode==='scale' || (state.showScale && state.mode!=='route');
+  if(showScale && state.scalePts.length===2){
+    const a=toScreen(state.scalePts[0]), b=toScreen(state.scalePts[1]);
+    ctx.setLineDash([8,6]); ctx.strokeStyle='#70c8ff'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.setLineDash([]);
+  }
+  if(state.route.length>1){
+    ctx.beginPath();
+    state.route.forEach((p,i)=>{const s=toScreen(p); i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y);});
+    ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=7; ctx.lineJoin='round'; ctx.stroke();
+    ctx.strokeStyle='#e5ba65'; ctx.lineWidth=4; ctx.stroke();
+  }
+  if(showScale) dots(state.scalePts,'#70c8ff');
+  dots(state.route,'#f2bd59');
+  drawScaleBar();
+}
+function dots(points,color){
+  points.forEach((p,i)=>{
+    const s=toScreen(p);
+    ctx.beginPath(); ctx.arc(s.x,s.y,6,0,Math.PI*2);
+    ctx.fillStyle=color; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#1a1a1a'; ctx.stroke();
+    ctx.font='bold 13px sans-serif'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,.8)';
+    ctx.strokeText(String(i+1),s.x+9,s.y-9); ctx.fillStyle='white'; ctx.fillText(String(i+1),s.x+9,s.y-9);
+  });
+}
+// Barra de escala no canto inferior esquerdo, com valor redondo e ajustada ao zoom
+function drawScaleBar(){
+  if(!state.milesPerPx) return;
+  const perCssPx = state.milesPerPx/state.view.s*f();
+  const target = 140*perCssPx;
+  const p10 = Math.pow(10, Math.floor(Math.log10(target)));
+  let nice = p10;
+  for(const m of [1,2,5]) if(m*p10<=target) nice=m*p10;
+  const len = nice/perCssPx;
+  const x=14, y=cssH-18;
+  const label = nf(nice,3)+' '+(nice===1?dUnit1():dUnit());
+  ctx.font='bold 13px sans-serif';
+  const w=Math.max(len, ctx.measureText(label).width)+16;
+  ctx.fillStyle='rgba(23,23,23,.78)';
+  ctx.fillRect(x-8, y-26, w, 36);
+  ctx.strokeStyle='#eee8dc'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(x,y-6); ctx.lineTo(x,y); ctx.lineTo(x+len,y); ctx.lineTo(x+len,y-6);
+  ctx.moveTo(x+len/2,y-3); ctx.lineTo(x+len/2,y);
+  ctx.stroke();
+  ctx.fillStyle='#eee8dc'; ctx.fillText(label, x, y-11);
+}
+
+// Ponteiro: clique marca ponto, arrastar move, pinça/roda dá zoom
+const pointers=new Map(); let drag=null, pinch=null;
+function localPos(e){ const r=canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+canvas.addEventListener('pointerdown',e=>{
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, localPos(e));
+  if(pointers.size===1){
+    const p=localPos(e);
+    drag={x:p.x,y:p.y,ox:state.view.ox,oy:state.view.oy,moved:false};
+  }else if(pointers.size===2){
+    const [a,b]=[...pointers.values()];
+    pinch={d:Math.hypot(a.x-b.x,a.y-b.y)}; drag=null;
+  }
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, localPos(e));
+  if(pinch && pointers.size===2){
+    const [a,b]=[...pointers.values()];
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    zoomAt((a.x+b.x)/2,(a.y+b.y)/2,d/pinch.d); pinch.d=d;
+  }else if(drag && state.image){
+    const p=localPos(e);
+    const dx=p.x-drag.x, dy=p.y-drag.y;
+    if(!drag.moved && Math.hypot(dx,dy)>5){ drag.moved=true; canvas.style.cursor='grabbing'; }
+    if(drag.moved){ state.view.ox=drag.ox+dx; state.view.oy=drag.oy+dy; draw(); }
+  }
+});
+function endPointer(e){
+  if(drag && !drag.moved && !pinch && e.type==='pointerup') handlePick(localPos(e));
+  pointers.delete(e.pointerId);
+  if(pointers.size<2) pinch=null;
+  if(pointers.size===0){ drag=null; canvas.style.cursor=''; }
+}
+canvas.addEventListener('pointerup',endPointer);
+canvas.addEventListener('pointercancel',endPointer);
+canvas.addEventListener('wheel',e=>{
+  if(!state.image) return;
+  e.preventDefault();
+  const p=localPos(e);
+  zoomAt(p.x,p.y, e.deltaY<0?1.2:1/1.2);
+},{passive:false});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && state.mode!=='none') setMode('none'); });
+
+function setMode(m){
+  if(m!=='none' && !state.image){ alert('Carregue um mapa primeiro.'); return; }
+  state.mode = state.mode===m ? 'none' : m;
+  if(state.mode==='scale') state.scalePts=[];
+  if(state.mode==='route') state.showScale=false;
+  $('scaleBtn').classList.toggle('active-mode', state.mode==='scale');
+  $('routeBtn').classList.toggle('active-mode', state.mode==='route');
+  canvas.classList.toggle('picking', state.mode!=='none');
+  $('mapStatus').textContent =
+    state.mode==='scale' ? 'Clique em dois pontos de distância conhecida (Esc cancela).' :
+    state.mode==='route' ? 'Clique no início, nas curvas e no destino. Clique de novo no botão ou Esc para terminar.' :
+    statusText();
+  draw();
+}
+function handlePick(pos){
+  if(!state.image || state.mode==='none') return;
+  const p=toImage(pos.x,pos.y);
+  if(state.mode==='scale'){
+    state.scalePts.push(p);
+    if(state.scalePts.length===2){ state.showScale=true; computeScale(); setMode('none'); }
+  }else{
+    state.route.push(p);
+    $('mapStatus').textContent=state.route.length+' pontos na rota.';
+    updateRoute(); touch();
+  }
+  draw();
+}
+// Escala pelos 2 pontos marcados
+function computeScale(){
+  const v=Number($('scaleDistance').value);
+  if(state.scalePts.length===2 && v>0){
+    const [a,b]=state.scalePts;
+    const px=Math.hypot(b.x-a.x,b.y-a.y);
+    if(px>0){
+      state.scaleMiles=v/f();
+      state.milesPerPx=state.scaleMiles/px;
+      updateScaleInfo(); updateRoute(); touch(); draw();
+    }
+  }
+}
+// Escala digitada: pixels da imagem original por unidade de distância
+function manualScaleInput(){
+  const v=Number($('manualScale').value);
+  if(!(v>0)) return;
+  state.milesPerPx = 1/(v*f());
+  state.scalePts=[]; state.scaleMiles=null; state.showScale=false;
+  updateScaleInfo(); updateRoute(); touch(); draw();
+}
+function updateScaleInfo(){
+  const ms=$('manualScale');
+  if(state.milesPerPx){
+    const pxPerUnit = 1/(state.milesPerPx*f());
+    if(document.activeElement!==ms) ms.value = +pxPerUnit.toFixed(3);
+    let txt;
+    if(state.scalePts.length===2){
+      const [a,b]=state.scalePts;
+      txt='Calibrada no mapa com '+nf(state.scaleMiles*f(),3)+' '+dUnit()+' em '+nf(Math.hypot(b.x-a.x,b.y-a.y),0)+' px.';
+    }else txt='Escala digitada.';
+    if(state.image) txt+=' Vale para esta imagem ('+state.image.naturalWidth+' × '+state.image.naturalHeight+' px): passe o número de pixels por '+dUnit1()+' para a mesa usar a mesma escala.';
+    $('scaleDetail').textContent=txt;
+  }else{
+    if(document.activeElement!==ms) ms.value='';
+    $('scaleDetail').textContent='Sem escala definida.';
+  }
+  if(state.mode==='none') $('mapStatus').textContent=statusText();
+}
+function statusText(){
+  if(!state.image) return 'Carregue um mapa para começar.';
+  const saved = state.mapId ? 'Salvo.' : 'Ainda não salvo.';
+  if(!state.milesPerPx) return 'Mapa carregado. Defina a escala. '+saved;
+  return 'Pronto para traçar a rota. '+saved;
+}
+function undoPoint(){
+  if(state.mode==='scale') state.scalePts.pop();
+  else { state.route.pop(); updateRoute(); touch(); }
+  draw();
+}
+function clearRoute(){ state.route=[]; draw(); updateRoute(); touch(); }
+function getRouteMiles(){
+  if(!state.milesPerPx || state.route.length<2) return 0;
+  let px=0;
+  for(let i=1;i<state.route.length;i++)
+    px+=Math.hypot(state.route[i].x-state.route[i-1].x, state.route[i].y-state.route[i-1].y);
+  return px*state.milesPerPx;
+}
+function updateRoute(){
+  $('routeDistance').textContent=fmtDist(getRouteMiles());
+  calculate();
+}
+
+// Usa data URL: blob: URLs são bloqueadas em algumas visualizações embutidas.
+function loadImageBlob(blob){
+  return new Promise((res,rej)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>rej(new Error('Não foi possível ler o arquivo.'));
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>res(img);
+      img.onerror=()=>rej(new Error('O navegador não conseguiu decodificar a imagem.'));
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+$('mapFile').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    state.image=await loadImageBlob(file);
+    state.imageBlob=file; state.mapId=null;
+    state.scalePts=[]; state.route=[]; state.scaleMiles=null; state.milesPerPx=null; state.showScale=false;
+    $('mapName').value=file.name.replace(/\.[^.]+$/,'');
+    $('savedMaps').value='';
+    state.mode='scale'; setMode('none'); resizeCanvas(true); updateScaleInfo(); updateRoute();
+  }catch(err){
+    console.error(err);
+    alert('Não foi possível abrir a imagem: '+(err&&err.message?err.message:err));
+  }
+  e.target.value='';
+});
+let lastW=0;
+window.addEventListener('resize',()=>{
+  const w=canvas.parentElement.clientWidth;
+  if(w!==lastW){ lastW=w; resizeCanvas(true); }
+});
+
+// ---------- Persistência (IndexedDB guarda a imagem original) ----------
+const DB={
+  db:null,
+  open(){
+    return new Promise((res,rej)=>{
+      const r=indexedDB.open('dnd-viagem',1);
+      r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore('maps',{keyPath:'id'}); d.createObjectStore('meta'); };
+      r.onsuccess=()=>{ this.db=r.result; res(); };
+      r.onerror=()=>rej(r.error);
+    });
+  },
+  run(store,mode,fn){
+    return new Promise((res,rej)=>{
+      const t=this.db.transaction(store,mode); const req=fn(t.objectStore(store));
+      t.oncomplete=()=>res(req?req.result:undefined);
+      t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error);
+    });
+  },
+  all(){ return this.run('maps','readonly',s=>s.getAll()); },
+  get(id){ return this.run('maps','readonly',s=>s.get(id)); },
+  put(rec){ return this.run('maps','readwrite',s=>s.put(rec)); },
+  del(id){ return this.run('maps','readwrite',s=>s.delete(id)); },
+  setMeta(k,v){ return this.run('meta','readwrite',s=>s.put(v,k)); },
+  getMeta(k){ return this.run('meta','readonly',s=>s.get(k)); }
+};
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+function currentRecord(id){
+  return {
+    id, name:$('mapName').value.trim()||'Mapa sem nome',
+    blob:state.imageBlob, scalePts:state.scalePts.length===2?state.scalePts:[],
+    scaleMiles:state.scaleMiles, milesPerPx:state.milesPerPx,
+    route:state.route, updated:Date.now()
+  };
+}
+async function saveMap(silent){
+  if(!DB.db){ if(!silent) alert('O navegador bloqueou o armazenamento local. Use Exportar mapa.'); return; }
+  if(!state.imageBlob){ if(!silent) alert('Carregue um mapa primeiro.'); return; }
+  const rec=currentRecord(state.mapId||newId());
+  try{
+    await DB.put(rec);
+    state.mapId=rec.id;
+    await DB.setMeta('lastId',rec.id);
+    if(!silent) await refreshList();
+    updateScaleInfo();
+  }catch(err){ if(!silent) alert('Falha ao salvar: '+err.message); }
+}
+let saveTimer=null;
+function touch(){ if(state.mapId){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>saveMap(true),400); } }
+
+async function refreshList(){
+  const sel=$('savedMaps');
+  const maps=DB.db?(await DB.all()):[];
+  maps.sort((a,b)=>b.updated-a.updated);
+  sel.innerHTML='<option value="">'+(maps.length?'Escolha um mapa':'Nenhum mapa salvo')+'</option>';
+  maps.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.name; sel.appendChild(o); });
+  sel.value=state.mapId||'';
+}
+async function openRecord(rec){
+  state.image=await loadImageBlob(rec.blob);
+  state.imageBlob=rec.blob; state.mapId=rec.id;
+  state.scalePts=rec.scalePts||[]; state.route=rec.route||[];
+  state.scaleMiles=rec.scaleMiles||null; state.milesPerPx=rec.milesPerPx||null; state.showScale=false;
+  $('mapName').value=rec.name;
+  if(state.scalePts.length===2 && state.scaleMiles){
+    const [a,b]=state.scalePts;
+    if(!state.milesPerPx) state.milesPerPx=state.scaleMiles/Math.hypot(b.x-a.x,b.y-a.y);
+    $('scaleDistance').value=+(state.scaleMiles*f()).toFixed(3);
+  }
+  state.mode='scale'; setMode('none');
+  resizeCanvas(true); updateScaleInfo(); updateRoute();
+  $('savedMaps').value=rec.id;
+  if(DB.db) DB.setMeta('lastId',rec.id);
+}
+async function loadSelected(){
+  const id=$('savedMaps').value; if(!id) return;
+  const rec=await DB.get(id); if(rec) await openRecord(rec);
+}
+async function deleteSelected(){
+  const id=$('savedMaps').value; if(!id) return;
+  const name=$('savedMaps').selectedOptions[0].textContent;
+  if(!confirm('Excluir o mapa "'+name+'"? Isso não pode ser desfeito.')) return;
+  await DB.del(id);
+  if(state.mapId===id) state.mapId=null;
+  await refreshList(); updateScaleInfo();
+}
+
+// Exportar e importar (backup ou outro navegador)
+function blobToDataURL(blob){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(blob); });
+}
+function dataURLToBlob(url){
+  const [head,b64]=url.split(',');
+  const mime=(head.match(/data:([^;]+)/)||[])[1]||'image/png';
+  const bin=atob(b64); const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+async function exportMap(){
+  if(!state.imageBlob){ alert('Carregue um mapa primeiro.'); return; }
+  const rec=currentRecord(state.mapId||newId());
+  const data={format:'dnd-viagem-mapa',version:2,name:rec.name,image:await blobToDataURL(rec.blob),
+    scalePts:rec.scalePts,scaleMiles:rec.scaleMiles,milesPerPx:rec.milesPerPx,route:rec.route};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));
+  const a=document.createElement('a'); a.href=url; a.download=rec.name.replace(/[\\/:*?"<>|]/g,'_')+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+$('importFile').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const data=JSON.parse(await file.text());
+    if(data.format!=='dnd-viagem-mapa') throw new Error('Arquivo não é um mapa exportado por esta calculadora.');
+    const rec={id:newId(),name:data.name||'Mapa importado',blob:dataURLToBlob(data.image),
+      scalePts:data.scalePts||[],scaleMiles:data.scaleMiles||null,milesPerPx:data.milesPerPx||null,
+      route:data.route||[],updated:Date.now()};
+    if(DB.db) await DB.put(rec);
+    await openRecord(rec);
+    if(!DB.db) state.mapId=null;
+    await refreshList();
+  }catch(err){ alert('Falha ao importar: '+err.message); }
+  e.target.value='';
+});
+
+// ---------- Inicialização ----------
+(async function init(){
+  buildTypes(); updateTransportUI(); hoursDisplay(); calculate();
+  lastW=canvas.parentElement.clientWidth; resizeCanvas(false);
+  try{
+    await DB.open();
+    if(navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    await refreshList();
+    const last=await DB.getMeta('lastId');
+    if(last){ const rec=await DB.get(last); if(rec) await openRecord(rec); }
+  }catch(err){
+    $('savedMaps').innerHTML='<option value="">Armazenamento indisponível</option>';
+    $('mapStatus').textContent='Este navegador bloqueou o armazenamento local. Use Exportar e Importar mapa.';
+  }
+})();
+</script>
+</body>
+</html>
